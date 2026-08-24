@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kasir Mandiri — Sistem POS Self-Service Cashless untuk Kantin Sekolah">
+    <title>Kasir Mandiri — Kantin Sekolah</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- TensorFlow.js + Teachable Machine -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <!-- ========== HEADER ========== -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-icon">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="url(#logoGrad)"/>
+                    <path d="M8 12h16M8 16h12M8 20h8M22 18l4 4-4 4" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                    <defs><linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#06b6d4"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+                </svg>
+            </div>
+            <div>
+                <h1>Kasir Mandiri</h1>
+                <p class="header-subtitle">Kantin & Koperasi Sekolah</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="clock" id="liveClock">--:--:--</div>
+            <div class="date" id="liveDate">-- --- ----</div>
+        </div>
+    </header>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="app-main">
+
+        <!-- === LEFT: Scanner + Cart === -->
+        <section class="left-panel">
+
+            <!-- Scanner -->
+            <div class="card scanner-card">
+                <div class="card-header">
+                    <h2>
+                        <span class="icon-scan">📷</span>
+                        Pemindai Produk
+                    </h2>
+                    <div class="scanner-status" id="scannerStatus">
+                        <span class="status-dot offline"></span>
+                        <span>Offline</span>
+                    </div>
+                </div>
+                <div class="scanner-viewport" id="scannerViewport">
+                    <div class="scanner-placeholder" id="scannerPlaceholder">
+                        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                            <rect x="4" y="4" width="56" height="56" rx="12" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
+                            <circle cx="32" cy="28" r="10" stroke="currentColor" stroke-width="2"/>
+                            <path d="M20 44c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <p>Klik untuk mengaktifkan kamera</p>
+                    </div>
+                    <div id="webcamContainer" class="webcam-container" style="display:none;">
+                        <!-- Webcam canvas akan diinjeksi di sini oleh TM library -->
+                    </div>
+                    <div class="scan-overlay" id="scanOverlay" style="display:none;">
+                        <div class="scan-corners">
+                            <span class="corner tl"></span>
+                            <span class="corner tr"></span>
+                            <span class="corner bl"></span>
+                            <span class="corner br"></span>
+                        </div>
+                        <div class="scan-line"></div>
+                    </div>
+                    <div class="detection-badge" id="detectionBadge" style="display:none;">
+                        <span class="badge-label" id="badgeLabel">—</span>
+                        <span class="badge-confidence" id="badgeConfidence">0%</span>
+                    </div>
+                </div>
+                <div class="scanner-controls">
+                    <button class="btn btn-primary" id="btnStartScanner">
+                        <span>▶</span> Mulai Scan
+                    </button>
+                    <button class="btn btn-outline" id="btnStopScanner" disabled>
+                        <span>⏹</span> Berhenti
+                    </button>
+                </div>
+            </div>
+
+            <!-- Prediction Results -->
+            <div class="card predictions-card" id="predictionsCard" style="display:none;">
+                <div class="card-header">
+                    <h2>🤖 Hasil Deteksi AI</h2>
+                </div>
+                <div class="predictions-list" id="predictionsList">
+                    <!-- Diisi oleh JS -->
+                </div>
+            </div>
+
+            <!-- Product Recommendations -->
+            <div class="card recommendations-card" id="recommendationsCard">
+                <div class="card-header">
+                    <h2>🔥 Sering Dibeli</h2>
+                </div>
+                <div class="recommendations-list" id="recommendationsList">
+                    <div class="recommendations-loading">Memuat rekomendasi...</div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- === CENTER: Cart === -->
+        <section class="center-panel">
+            <div class="card cart-card">
+                <div class="card-header">
+                    <h2>
+                        <span>🛒</span>
+                        Keranjang Belanja
+                    </h2>
+                    <span class="cart-count" id="cartCount">0</span>
+                </div>
+
+                <div class="cart-items" id="cartItems">
+                    <div class="cart-empty" id="cartEmpty">
+                        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                            <circle cx="40" cy="40" r="36" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4" opacity="0.3"/>
+                            <path d="M25 30h5l3 20h14l4-14H33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+                            <circle cx="38" cy="54" r="2.5" fill="currentColor" opacity="0.4"/>
+                            <circle cx="49" cy="54" r="2.5" fill="currentColor" opacity="0.4"/>
+                        </svg>
+                        <p>Keranjang masih kosong</p>
+                        <span>Arahkan produk ke kamera untuk memulai</span>
+                    </div>
+                    <!-- Cart items diisi oleh JS -->
+                </div>
+
+                <div class="cart-summary" id="cartSummary" style="display:none;">
+                    <div class="summary-row">
+                        <span>Subtotal</span>
+                        <span id="subtotalDisplay">Rp 0</span>
+                    </div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-row total">
+                        <span>Total</span>
+                        <span id="totalDisplay">Rp 0</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === RIGHT: Payment === -->
+        <section class="right-panel">
+            <div class="card payment-card">
+                <div class="card-header">
+                    <h2>
+                        <span>💳</span>
+                        Pembayaran
+                    </h2>
+                </div>
+
+                <!-- Step 1: Input NIS -->
+                <div class="payment-step" id="paymentStep1">
+                    <label class="input-label" for="nisInput">Nomor Induk Siswa (NIS)</label>
+                    <div class="input-group">
+                        <input 
+                            type="text" 
+                            id="nisInput" 
+                            placeholder="Masukkan NIS..." 
+                            maxlength="20"
+                            autocomplete="off"
+                        >
+                        <button class="btn btn-primary" id="btnCariSiswa">Cari</button>
+                    </div>
+
+                    <!-- Siswa Info (muncul setelah NIS valid) -->
+                    <div class="siswa-info" id="siswaInfo" style="display:none;">
+                        <div class="siswa-avatar" id="siswaAvatar">
+                            <span id="siswaInitial">?</span>
+                        </div>
+                        <div class="siswa-details">
+                            <h3 id="siswaNama">—</h3>
+                            <p id="siswaKelas">—</p>
+                        </div>
+                        <div class="siswa-saldo">
+                            <span class="saldo-label">Saldo</span>
+                            <span class="saldo-amount" id="siswaSaldo">Rp 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: PIN -->
+                <div class="payment-step" id="paymentStep2" style="display:none;">
+                    <label class="input-label" for="pinInput">Masukkan PIN</label>
+                    <div class="pin-input-group">
+                        <input type="password" id="pinInput" maxlength="6" placeholder="••••••" autocomplete="off">
+                    </div>
+                </div>
+
+                <!-- Tombol Bayar -->
+                <button class="btn btn-pay" id="btnBayar" disabled>
+                    <span class="btn-pay-icon">💳</span>
+                    <span class="btn-pay-text">Bayar Sekarang</span>
+                    <span class="btn-pay-amount" id="btnPayAmount">Rp 0</span>
+                </button>
+
+                <!-- Status Message -->
+                <div class="payment-message" id="paymentMessage" style="display:none;"></div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card quick-actions">
+                <button class="btn btn-outline btn-small" id="btnClearCart">🗑️ Kosongkan Keranjang</button>
+                <button class="btn btn-outline btn-small" id="btnResetAll">🔄 Reset Semua</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ========== RECEIPT MODAL ========== -->
+    <div class="modal-overlay" id="receiptModal" style="display:none;">
+        <div class="modal-content receipt-modal">
+            <div class="receipt" id="receiptContent">
+                <!-- Diisi oleh receipt.js -->
+            </div>
+            <div class="modal-actions no-print">
+                <button class="btn btn-primary" id="btnPrintReceipt">🖨️ Cetak Struk</button>
+                <button class="btn btn-outline" id="btnCloseReceipt">Selesai</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== LOADING OVERLAY ========== -->
+    <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p id="loadingText">Memproses transaksi...</p>
+        </div>
+    </div>
+
+    <!-- ========== TOAST NOTIFICATIONS ========== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ========== SCRIPTS ========== -->
+    <script src="js/app.js"></script>
+    <script src="js/scanner.js"></script>
+    <script src="js/cart.js"></script>
+    <script src="js/payment.js"></script>
+    <script src="js/receipt.js"></script>
+
+</body>
+</html>
